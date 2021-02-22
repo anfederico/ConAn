@@ -2,32 +2,34 @@
 #' @import ggplot2
 #' 
 #' @export
-plot_connectivity <- function(output) {
-    mapply(function(cv_r, cv_t, mod_name){
-        
-        r_name <- output$args$ctrl
-        t_name <- output$args$cond
+plot_connectivity <- function(ctrl, cond, mean_correct, cv_r_bg, cv_t_bg,  mods_cv_r, mods_cv_t, mod_names) {
+    
+   # Wes Anderson: Darjeeling
+   # Blue Red Teal Orange
+   	palette <- c("#5BBCD6", "#FF0000", "#00A08A", "#F2AD00")
+	r_name <- ctrl
+    t_name <- cond
 
-        df <- data.frame(Connectivity = c(cv_r, cv_t),
-                         Group = c(rep(r_name, length(cv_r)),
-                                   rep(t_name, length(cv_t))))
+    r_bg_name <- paste(r_name, "(BG)")
+    t_bg_name <- paste(t_name, "(BG)")
+
+	mapply(function(cv_r, cv_t, mod_name){
+		df <- c()		   
+		if(!mean_correct) {
+        	df <- data.frame(Connectivity = c(cv_r, cv_t),
+                         	Group = factor(c(rep(r_name, length(cv_r)),
+										  	rep(t_name, length(cv_t))),
+											levels = c(r_name, t_name)))
         
-        if (output$args$mean_correct) {
-            
-            cv_r_bg <- output$bg$cv_r_bg
-            cv_t_bg <- output$bg$cv_t_bg
+		else {
+            r_bg <- unlist(cv_r_bg)
+            t_bg <- unlist(cv_t_bg)
                 
-            r_bg_name <- paste(r_name, "(BG)")
-            t_bg_name <- paste(t_name, "(BG)")
-
-            df <- rbind(df, data.frame(Connectivity = c(cv_r_bg, cv_t_bg),
-                                       Group = c(rep(r_bg_name, length(cv_r_bg)),
-                                                 rep(t_bg_name, length(cv_t_bg)))))
-        }
-        
-        # Wes Anderson: Darjeeling
-        # Blue Red Teal Orange
-        palette <- c("#5BBCD6", "#FF0000", "#00A08A", "#F2AD00")
+            df <- data.frame(Connectivity = c(r_bg, t_bg),
+                             Group = factor(c(rep(r_bg_name, length(r_bg)),
+											  rep(t_bg_name, length(t_bg))),
+											levels = c(r_bg_name, t_bg_name)))
+        } 
 
         df %>% 
         ggplot(aes(y=Connectivity, x=Group, fill=Group)) +
@@ -39,17 +41,16 @@ plot_connectivity <- function(output) {
         theme(axis.text.x=element_text(angle=30))+
         scale_fill_manual(values=palette)
 
-    }, output$stat$mods_cv_r, output$stat$mods_cv_t, output$data$mod_names, SIMPLIFY=FALSE)
+    }, mods_cv_r, mods_cv_t, mod_names, SIMPLIFY=FALSE)
 }
 
 #' @import magrittr
 #' @import ggplot2
 #' 
 #' @export
-plot_permutations <- function(output) {
-    mdc_type <- output$args$mdc_type
-    mod_names <- output$data$mod_names
-    mdc_permutated <- data.frame(output$iter) %>%
+plot_permutations <- function(mdc_type, mod_names, iter, mods_mdc_adj) {
+    mdc_type <- mdc_type
+    mdc_permutated <- data.frame(iter) %>%
                       set_colnames(mod_names)
     
     mapply(function(mdc_permuted, mdc_value, mod_name) {
@@ -73,5 +74,5 @@ plot_permutations <- function(output) {
         geom_vline(xintercept=mdc_value, linetype="dotted", size=1) +
         theme(axis.title.x=element_text(vjust=-1))
         
-    }, mdc_permutated, output$stat$mods_mdc_adj, mod_names, SIMPLIFY=FALSE)
+    }, mdc_permutated, mods_mdc_adj, mod_names, SIMPLIFY=FALSE)
 }

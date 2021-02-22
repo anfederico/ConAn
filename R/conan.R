@@ -279,8 +279,8 @@ conan <- function(eset,
 
     if (plotting) {
         cat("Generating plots...\n")
-        output$plots <- list(connectivity=plot_connectivity(output),
-                             permutations=plot_permutations(output))
+        output$plots <- list(connectivity=plot_connectivity(output$args$ctrl, output$args$cond, mean_correct, output$bg$cv_r_bg, output$bg$cv_t_bg, output$stat$mods_cv_r, output$stat$mods_cv_t, output$data$mod_names),
+                             permutations=plot_permutations(mdc_type, output$data$mod_names, output$iter, output$stat$mods_mdc_adj))
     }
     if (reporting) {
         cat("Generating report...\n")
