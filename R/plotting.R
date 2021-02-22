@@ -20,7 +20,8 @@ plot_connectivity <- function(ctrl, cond, mean_correct, cv_r_bg, cv_t_bg,  mods_
                          	Group = factor(c(rep(r_name, length(cv_r)),
 										  	rep(t_name, length(cv_t))),
 											levels = c(r_name, t_name)))
-        
+        }
+
 		else {
             r_bg <- unlist(cv_r_bg)
             t_bg <- unlist(cv_t_bg)
