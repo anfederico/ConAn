@@ -8,6 +8,8 @@
 #' @param sim_type Simulation type can be either c("bootstrap", "permutation")
 #' @param iter Number of sampling iterations during significance testing
 #' @param mean_correct Correct with background connectivity
+#' @param N_genes Number of randomly selected genes to be used during each iteration
+#' @param iter_bg Number of iterations used when calculating background (only used for non-NULL N_genes values
 #' @param cores Number of cores available for parallelization
 #' @param mdc_type Method for calculating difference in connectivity can be either c("fraction", "difference")
 #' @param reporting Generate a markdown report for analysis
@@ -29,11 +31,16 @@ conan <- function(eset,
                   sim_type=c("bootstrap", "permutation"),
                   iter=5,
                   mean_correct=FALSE,
+		  N_genes=NULL,
+		  iter_bg=20,
                   cores=1,
                   mdc_type=c("fraction", "difference"),
                   plotting=FALSE,
                   reporting=FALSE,
                   report_path="report.Rmd") {
+
+	# alternative sampling boolean
+	alt_samp <- !is.null(N_genes)
 
     cat("Starting differential connectivity analysis...\n")
 
@@ -73,6 +80,10 @@ conan <- function(eset,
 
     # Genes
     genes <- colnames(c_edat)
+	
+	if(alt_samp) {
+		if(N_genes > length(genes)) { stop(paste("N_genes value", N_genes, "is greater than the", length(genes), "number of genes in ExpressionSet object")) }
+	}
 
     # Store all data in output variable
     output <- list()
@@ -103,20 +114,27 @@ conan <- function(eset,
     # Calculate background modular connectivity
     if (mean_correct){
         cat("Calculating background connectivity...\n")
+		
+		cv_r_bg <- list()
+		cv_t_bg <- list() 
+		for (i in 1:iter_bg) {
+			# index of genes to be included in this iteration
+			g_sbst <- if (alt_samp) sample(1:length(genes), N_genes) else 1:length(genes)
+       
+	   		r_m <- r_edat[,g_sbst]
+			t_m <- t_edat[,g_sbst]
 
-        # Background connectivity vector
-        cv_r_bg <- r_edat %>% 
-                   atanh_lower_tri_erase_mods_cor(mods=mod_list)
+			# Background connectivity vector
+        	cv_r_bg <- append(cv_r_bg, list(atanh_lower_tri_erase_mods_cor(r_m, mods=mod_list)))
 
-        # Background module connectivity
-        mc_r_bg <- mean(cv_r_bg, na.rm=TRUE)
+        	# Background connectivity vector
+        	cv_t_bg <- append(cv_t_bg, list(atanh_lower_tri_erase_mods_cor(t_m, mods=mod_list)))
+		}
+		# Background module connectivity
+        mc_r_bg <- mean(unlist(cv_r_bg), na.rm=TRUE)
 
-        # Background connectivity vector
-        cv_t_bg <- t_edat %>% 
-                   atanh_lower_tri_erase_mods_cor(mods=mod_list)
-
-        # Background module connectivity
-        mc_t_bg <- mean(cv_t_bg, na.rm=TRUE)
+		# Background module connectivity
+        mc_t_bg <- mean(unlist(cv_t_bg), na.rm=TRUE)
 
         # Storage for background statistics
         output$bg <- list(cv_r_bg=cv_r_bg,
@@ -192,7 +210,7 @@ conan <- function(eset,
 
     # 2.
     # Background connectivity for each iteration
-    iter_background <- mclapply(iter_sampling, do_background, c_edat=c_edat, mods=mod_list, mean_correct=mean_correct, mc.cores=cores)
+    iter_background <- mclapply(iter_sampling, do_background, c_edat=c_edat, mods=mod_list, mean_correct=mean_correct, N_genes=N_genes, mc.cores=cores)
 
     # 3.
     # Calculate differential module connectivity
@@ -261,8 +279,8 @@ conan <- function(eset,
 
     if (plotting) {
         cat("Generating plots...\n")
-        output$plots <- list(connectivity=plot_connectivity(output),
-                             permutations=plot_permutations(output))
+        output$plots <- list(connectivity=plot_connectivity(output$args$ctrl, output$args$cond, mean_correct, output$bg$cv_r_bg, output$bg$cv_t_bg, output$stat$mods_cv_r, output$stat$mods_cv_t, output$data$mod_names),
+                             permutations=plot_permutations(mdc_type, output$data$mod_names, output$iter, output$stat$mods_mdc_adj))
     }
     if (reporting) {
         cat("Generating report...\n")
